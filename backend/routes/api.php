@@ -18,6 +18,11 @@ use App\Http\Controllers\OrderController;
 |
 */
 
+// Health check endpoint
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok', 'version' => '1.0.0']);
+});
+
 // Public routes
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
