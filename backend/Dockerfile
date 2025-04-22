@@ -31,13 +31,21 @@ RUN docker-php-ext-install gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Copy application files
-COPY . /var/www
+COPY backend/ /var/www/
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www
 
-# Expose port 8000
-EXPOSE 8000
+# Install dependencies
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 
-# Start PHP server
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"] 
+# Generate application key if not exists
+RUN php artisan key:generate --force
+
+# Expose port for the application
+EXPOSE $PORT
+
+# Start the application
+CMD php artisan migrate --force && \
+    php artisan db:seed --force && \
+    php artisan serve --host=0.0.0.0 --port=$PORT 
