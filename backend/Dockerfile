@@ -31,7 +31,7 @@ RUN docker-php-ext-install gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Copy application files
-COPY backend/ /var/www/
+COPY . /var/www/
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www
