@@ -3,6 +3,19 @@
 // Set content type to JSON
 header('Content-Type: application/json');
 
+// Enable CORS for all domains
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
+
+// Include database functions
+require_once 'db.php';
+
 // Determine the requested route
 $request_uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($request_uri, PHP_URL_PATH);
@@ -24,85 +37,217 @@ if ($path === '' || $path === 'api') {
         'endpoints' => [
             '/api/products',
             '/api/products/{id}',
-            '/api/health'
+            '/api/health',
+            '/api/setup',
+            '/api/users/register',
+            '/api/users/login'
         ]
     ];
 }
 
 // Health check
 if ($path === 'api/health') {
-    $response = [
-        'status' => 'ok',
-        'version' => '1.0.0',
-        'timestamp' => date('Y-m-d H:i:s')
-    ];
+    // Try connecting to the database as part of health check
+    $db = getDbConnection();
+    
+    if (is_array($db) && isset($db['error'])) {
+        $response = [
+            'status' => 'error',
+            'message' => 'Database connection failed',
+            'error' => $db['error'],
+            'version' => '1.0.0',
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+    } else {
+        $response = [
+            'status' => 'ok',
+            'message' => 'Service is healthy',
+            'database' => 'connected',
+            'version' => '1.0.0',
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+    }
 }
 
-// Products endpoint - return sample data
+// Products endpoint - return data from database
 if ($path === 'api/products') {
-    $response = [
-        'status' => 'success',
-        'products' => [
-            [
-                'id' => 1,
-                'name' => 'Product 1',
-                'price' => 19.99,
-                'description' => 'Product 1 description'
-            ],
-            [
-                'id' => 2,
-                'name' => 'Product 2',
-                'price' => 29.99,
-                'description' => 'Product 2 description'
-            ],
-            [
-                'id' => 3,
-                'name' => 'Product 3',
-                'price' => 39.99,
-                'description' => 'Product 3 description'
-            ]
-        ]
-    ];
+    $db = getDbConnection();
+    
+    if (is_array($db) && isset($db['error'])) {
+        $response = $db;
+    } else {
+        try {
+            $stmt = $db->query("SELECT * FROM products ORDER BY id");
+            $products = $stmt->fetchAll();
+            
+            $response = [
+                'status' => 'success',
+                'products' => $products
+            ];
+        } catch (PDOException $e) {
+            $response = [
+                'error' => 'Error fetching products: ' . $e->getMessage(),
+                'status' => 500
+            ];
+        }
+    }
 }
 
 // Single product endpoint
 if (count($path_parts) === 3 && $path_parts[0] === 'api' && $path_parts[1] === 'products' && is_numeric($path_parts[2])) {
     $product_id = (int)$path_parts[2];
+    $db = getDbConnection();
     
-    // Mock product data
-    $product = null;
-    $products = [
-        1 => [
-            'id' => 1,
-            'name' => 'Product 1',
-            'price' => 19.99,
-            'description' => 'Product 1 description'
-        ],
-        2 => [
-            'id' => 2,
-            'name' => 'Product 2',
-            'price' => 29.99,
-            'description' => 'Product 2 description'
-        ],
-        3 => [
-            'id' => 3,
-            'name' => 'Product 3',
-            'price' => 39.99,
-            'description' => 'Product 3 description'
-        ]
-    ];
+    if (is_array($db) && isset($db['error'])) {
+        $response = $db;
+    } else {
+        try {
+            $stmt = $db->prepare("SELECT * FROM products WHERE id = ?");
+            $stmt->execute([$product_id]);
+            $product = $stmt->fetch();
+            
+            if ($product) {
+                $response = [
+                    'status' => 'success',
+                    'product' => $product
+                ];
+            } else {
+                $response = [
+                    'error' => 'Product not found',
+                    'status' => 404
+                ];
+            }
+        } catch (PDOException $e) {
+            $response = [
+                'error' => 'Error fetching product: ' . $e->getMessage(),
+                'status' => 500
+            ];
+        }
+    }
+}
+
+// Database setup endpoint
+if ($path === 'api/setup') {
+    $result = setupDatabase();
     
-    if (isset($products[$product_id])) {
+    if ($result === true) {
         $response = [
             'status' => 'success',
-            'product' => $products[$product_id]
+            'message' => 'Database setup completed successfully'
         ];
     } else {
-        $response = [
-            'error' => 'Product not found',
-            'status' => 404
-        ];
+        $response = $result;
     }
+}
+
+// User registration endpoint
+if ($path === 'api/users/register' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Get JSON input
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (!$input || !isset($input['name']) || !isset($input['email']) || !isset($input['password'])) {
+        $response = [
+            'error' => 'Invalid input. Required fields: name, email, password',
+            'status' => 400
+        ];
+    } else {
+        $db = getDbConnection();
+        
+        if (is_array($db) && isset($db['error'])) {
+            $response = $db;
+        } else {
+            try {
+                // Check if email already exists
+                $stmt = $db->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+                $stmt->execute([$input['email']]);
+                $count = $stmt->fetchColumn();
+                
+                if ($count > 0) {
+                    $response = [
+                        'error' => 'Email already in use',
+                        'status' => 409
+                    ];
+                } else {
+                    // Hash password
+                    $password_hash = password_hash($input['password'], PASSWORD_DEFAULT);
+                    
+                    // Insert new user
+                    $stmt = $db->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+                    $stmt->execute([$input['name'], $input['email'], $password_hash]);
+                    
+                    $user_id = $db->lastInsertId();
+                    
+                    $response = [
+                        'status' => 'success',
+                        'message' => 'User registered successfully',
+                        'user_id' => $user_id
+                    ];
+                }
+            } catch (PDOException $e) {
+                $response = [
+                    'error' => 'Error registering user: ' . $e->getMessage(),
+                    'status' => 500
+                ];
+            }
+        }
+    }
+}
+
+// User login endpoint
+if ($path === 'api/users/login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Get JSON input
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (!$input || !isset($input['email']) || !isset($input['password'])) {
+        $response = [
+            'error' => 'Invalid input. Required fields: email, password',
+            'status' => 400
+        ];
+    } else {
+        $db = getDbConnection();
+        
+        if (is_array($db) && isset($db['error'])) {
+            $response = $db;
+        } else {
+            try {
+                // Find user by email
+                $stmt = $db->prepare("SELECT * FROM users WHERE email = ?");
+                $stmt->execute([$input['email']]);
+                $user = $stmt->fetch();
+                
+                if (!$user || !password_verify($input['password'], $user['password'])) {
+                    $response = [
+                        'error' => 'Invalid credentials',
+                        'status' => 401
+                    ];
+                } else {
+                    // Generate a simple token (in a real app, use JWT)
+                    $token = bin2hex(random_bytes(32));
+                    
+                    $response = [
+                        'status' => 'success',
+                        'message' => 'Login successful',
+                        'user' => [
+                            'id' => $user['id'],
+                            'name' => $user['name'],
+                            'email' => $user['email']
+                        ],
+                        'token' => $token
+                    ];
+                }
+            } catch (PDOException $e) {
+                $response = [
+                    'error' => 'Error during login: ' . $e->getMessage(),
+                    'status' => 500
+                ];
+            }
+        }
+    }
+}
+
+// Set HTTP status code if error
+if (isset($response['status']) && is_numeric($response['status']) && $response['status'] >= 400) {
+    http_response_code($response['status']);
 }
 
 // Return JSON response
