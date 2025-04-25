@@ -247,49 +247,56 @@ if ($path === 'api/users/login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get all environment variables (for debugging)
 if ($path === 'api/env') {
-    // Only in development mode
-    if (getenv('APP_ENV') !== 'production') {
-        $env_vars = [];
-        foreach ($_ENV as $key => $value) {
-            // Mask sensitive data
+    // Allow in all environments for debugging
+    $env_vars = [];
+    foreach ($_ENV as $key => $value) {
+        // Mask sensitive data
+        if (strpos(strtolower($key), 'password') !== false || 
+            strpos(strtolower($key), 'secret') !== false || 
+            strpos(strtolower($key), 'key') !== false) {
+            $env_vars[$key] = '******';
+        } else {
+            $env_vars[$key] = $value;
+        }
+    }
+    
+    // Also check getenv() 
+    $getenv_vars = [];
+    $env_list = [
+        'DATABASE_URL', 'PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD',
+        'DATABASE_HOST', 'DATABASE_PORT', 'DATABASE_NAME', 'DATABASE_USERNAME', 'DATABASE_PASSWORD',
+        'RAILWAY_ENVIRONMENT', 'PORT', 'RAILWAY_SERVICE_NAME'
+    ];
+    foreach ($env_list as $key) {
+        $value = getenv($key);
+        if ($value !== false) {
             if (strpos(strtolower($key), 'password') !== false || 
                 strpos(strtolower($key), 'secret') !== false || 
                 strpos(strtolower($key), 'key') !== false) {
-                $env_vars[$key] = '******';
+                $getenv_vars[$key] = '******';
             } else {
-                $env_vars[$key] = $value;
+                $getenv_vars[$key] = $value;
             }
         }
-        
-        // Also check getenv() 
-        $getenv_vars = [];
-        $env_list = [
-            'DATABASE_URL', 'PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD',
-            'DATABASE_HOST', 'DATABASE_PORT', 'DATABASE_NAME', 'DATABASE_USERNAME', 'DATABASE_PASSWORD'
-        ];
-        foreach ($env_list as $key) {
-            $value = getenv($key);
-            if ($value !== false) {
-                if (strpos(strtolower($key), 'password') !== false || 
-                    strpos(strtolower($key), 'secret') !== false || 
-                    strpos(strtolower($key), 'key') !== false) {
-                    $getenv_vars[$key] = '******';
-                } else {
-                    $getenv_vars[$key] = $value;
-                }
-            }
-        }
-        
-        $response = [
-            'env_vars' => $env_vars,
-            'getenv_vars' => $getenv_vars
-        ];
-    } else {
-        $response = [
-            'error' => 'Environment information not available in production mode',
-            'status' => 403
-        ];
     }
+    
+    // Check for Railway-specific environment variables
+    $railway_vars = [
+        'RAILWAY_ENVIRONMENT' => getenv('RAILWAY_ENVIRONMENT'),
+        'RAILWAY_SERVICE_NAME' => getenv('RAILWAY_SERVICE_NAME'),
+        'DATABASE_URL' => getenv('DATABASE_URL') ? 'Available' : 'Not set'
+    ];
+    
+    $response = [
+        'env_vars' => $env_vars,
+        'getenv_vars' => $getenv_vars,
+        'railway_vars' => $railway_vars,
+        'runtime_info' => [
+            'php_version' => phpversion(),
+            'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
+            'current_time' => date('Y-m-d H:i:s')
+        ]
+    ];
 }
 
 // Set HTTP status code if error

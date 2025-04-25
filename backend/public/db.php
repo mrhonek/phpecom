@@ -9,9 +9,21 @@ function getDbConnection() {
     // Debug information to see what environment variables are available
     $debug_info = [];
     
+    // Hard-coded Railway values (based on user feedback)
+    $railway_host = 'postgres.railway.internal';
+    $railway_dbname = 'railway';
+    
+    // First check if Railway variables exist with expected values
+    if (getenv('RAILWAY_ENVIRONMENT') !== false) {
+        $debug_info['using_railway_defaults'] = true;
+        $db_host = $railway_host;
+        $db_port = getenv('PGPORT') ?: '5432';
+        $db_name = $railway_dbname;
+        $db_user = getenv('PGUSER') ?: 'postgres';
+        $db_password = getenv('PGPASSWORD') ?: '';
+    }
     // Get environment variables - Railway provides database URL as DATABASE_URL
-    $database_url = getenv('DATABASE_URL');
-    if ($database_url) {
+    else if ($database_url = getenv('DATABASE_URL')) {
         $debug_info['using_database_url'] = true;
         // Parse the DATABASE_URL
         $db_params = parse_url($database_url);
@@ -41,6 +53,18 @@ function getDbConnection() {
     $db_name = $db_name ?: 'phpecom';
     $db_user = $db_user ?: 'postgres';
     $db_password = $db_password ?: 'postgres';
+    
+    // Add all environment variables for debugging
+    $env_vars = [];
+    foreach ($_ENV as $key => $value) {
+        if (strpos(strtolower($key), 'database') !== false || 
+            strpos(strtolower($key), 'db_') !== false || 
+            strpos(strtolower($key), 'pg') !== false || 
+            strpos(strtolower($key), 'railway') !== false) {
+            $env_vars[$key] = (strpos(strtolower($key), 'password') !== false) ? '******' : $value;
+        }
+    }
+    $debug_info['relevant_env_vars'] = $env_vars;
     
     $debug_info['final_connection'] = [
         'host' => $db_host,
