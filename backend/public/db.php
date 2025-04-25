@@ -9,18 +9,38 @@ function getDbConnection() {
     // Debug information to see what environment variables are available
     $debug_info = [];
     
-    // Hard-coded Railway values (based on user feedback)
-    $railway_host = 'postgres.railway.internal';
-    $railway_dbname = 'railway';
+    // Check if we have a full DB_CONNECTION string (from env data)
+    if ($db_connection = getenv('DB_CONNECTION')) {
+        $debug_info['using_connection_string'] = true;
+        try {
+            // The connection string format is: postgresql://postgres:password@host:port/dbname
+            $pdo = new PDO($db_connection);
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            return $pdo;
+        } catch (PDOException $e) {
+            $debug_info['connection_string_error'] = $e->getMessage();
+            // Continue with other connection methods
+        }
+    }
     
-    // First check if Railway variables exist with expected values
-    if (getenv('RAILWAY_ENVIRONMENT') !== false) {
+    // Check for Railway DB_* variables (from env data)
+    if (getenv('DB_HOST') && getenv('DB_USERNAME')) {
+        $debug_info['using_db_vars'] = true;
+        $db_host = getenv('DB_HOST');
+        $db_port = getenv('DB_PORT') ?: '5432';
+        $db_name = getenv('DB_DATABASE') ?: 'railway';
+        $db_user = getenv('DB_USERNAME');
+        $db_password = getenv('DB_PASSWORD');
+    }
+    // Hard-coded Railway values (based on user feedback)
+    else if (getenv('RAILWAY_ENVIRONMENT') !== false) {
         $debug_info['using_railway_defaults'] = true;
-        $db_host = $railway_host;
+        $db_host = 'postgres.railway.internal';
         $db_port = getenv('PGPORT') ?: '5432';
-        $db_name = $railway_dbname;
+        $db_name = 'railway';
         $db_user = getenv('PGUSER') ?: 'postgres';
-        $db_password = getenv('PGPASSWORD') ?: '';
+        $db_password = getenv('PGPASSWORD') ?: getenv('DB_PASSWORD'); // Try both password variables
     }
     // Get environment variables - Railway provides database URL as DATABASE_URL
     else if ($database_url = getenv('DATABASE_URL')) {
@@ -52,7 +72,7 @@ function getDbConnection() {
     $db_port = $db_port ?: '5432';
     $db_name = $db_name ?: 'phpecom';
     $db_user = $db_user ?: 'postgres';
-    $db_password = $db_password ?: 'postgres';
+    $db_password = $db_password ?: '';
     
     // Add all environment variables for debugging
     $env_vars = [];
