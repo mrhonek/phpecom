@@ -1,27 +1,37 @@
-FROM php:8.2-cli
+FROM php:8.2-apache
 
-WORKDIR /app
+WORKDIR /var/www/html
 
+# Install dependencies
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
+    libpq-dev \
     zip \
     unzip \
-    libpq-dev
+    git
 
-RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd
+# Enable Apache modules and PHP extensions
+RUN a2enmod rewrite
+RUN docker-php-ext-install pdo pdo_pgsql
 
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-COPY backend/ /app/
+# Copy backend files
+COPY backend/ /var/www/html/
 
-RUN composer install --optimize-autoloader --no-interaction --no-progress
+# Install dependencies
+RUN composer install --no-interaction --no-progress
 
-RUN php artisan key:generate --force
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html
+RUN chmod -R 755 /var/www/html/storage
 
+# Expose port
 EXPOSE $PORT
 
-CMD php artisan serve --host=0.0.0.0 --port=$PORT 
+# Configure Apache for dynamic port
+RUN echo 'Listen ${PORT}' > /etc/apache2/ports.conf
+RUN sed -i 's/80/${PORT}/g' /etc/apache2/sites-available/000-default.conf
+
+# Start Apache
+CMD ["apache2-foreground"] 
