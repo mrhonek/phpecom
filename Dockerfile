@@ -13,18 +13,11 @@ RUN apt-get update && apt-get install -y \
 RUN a2enmod rewrite
 RUN docker-php-ext-install pdo pdo_pgsql
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
 # Copy backend files
-COPY backend/ /var/www/html/
-
-# Install dependencies
-RUN composer install --no-interaction --no-progress
+COPY backend/public/ /var/www/html/
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html
-RUN chmod -R 755 /var/www/html/storage
 
 # Expose port
 EXPOSE $PORT
