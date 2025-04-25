@@ -1,6 +1,5 @@
 FROM node:18-alpine as build
 
-# Set working directory
 WORKDIR /app
 
 # Copy package.json files
@@ -10,7 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm install
 
 # Copy the rest of the app
-COPY . .
+COPY . ./
 
 # Set API URL environment variable
 ARG API_URL
