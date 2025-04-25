@@ -6,12 +6,49 @@
  */
 
 function getDbConnection() {
-    // Get environment variables - Railway automatically provides these
-    $db_host = getenv('PGHOST') ?: 'localhost';
-    $db_port = getenv('PGPORT') ?: '5432';
-    $db_name = getenv('PGDATABASE') ?: 'phpecom';
-    $db_user = getenv('PGUSER') ?: 'postgres';
-    $db_password = getenv('PGPASSWORD') ?: 'postgres';
+    // Debug information to see what environment variables are available
+    $debug_info = [];
+    
+    // Get environment variables - Railway provides database URL as DATABASE_URL
+    $database_url = getenv('DATABASE_URL');
+    if ($database_url) {
+        $debug_info['using_database_url'] = true;
+        // Parse the DATABASE_URL
+        $db_params = parse_url($database_url);
+        $db_host = $db_params['host'] ?? null;
+        $db_port = $db_params['port'] ?? null;
+        $db_name = ltrim($db_params['path'] ?? '', '/');
+        $db_user = $db_params['user'] ?? null;
+        $db_password = $db_params['pass'] ?? null;
+    } else {
+        // Specific Railway PostgreSQL environment variables
+        $db_host = getenv('PGHOST') ?: getenv('DATABASE_HOST');
+        $db_port = getenv('PGPORT') ?: getenv('DATABASE_PORT');
+        $db_name = getenv('PGDATABASE') ?: getenv('DATABASE_NAME');
+        $db_user = getenv('PGUSER') ?: getenv('DATABASE_USERNAME');
+        $db_password = getenv('PGPASSWORD') ?: getenv('DATABASE_PASSWORD');
+        
+        $debug_info['using_specific_vars'] = true;
+        $debug_info['host_var'] = [
+            'PGHOST' => getenv('PGHOST'),
+            'DATABASE_HOST' => getenv('DATABASE_HOST')
+        ];
+    }
+    
+    // Fall back to defaults if still not set
+    $db_host = $db_host ?: 'localhost';
+    $db_port = $db_port ?: '5432';
+    $db_name = $db_name ?: 'phpecom';
+    $db_user = $db_user ?: 'postgres';
+    $db_password = $db_password ?: 'postgres';
+    
+    $debug_info['final_connection'] = [
+        'host' => $db_host,
+        'port' => $db_port,
+        'dbname' => $db_name,
+        'user' => $db_user,
+        'password' => $db_password ? '******' : null
+    ];
     
     try {
         $dsn = "pgsql:host=$db_host;port=$db_port;dbname=$db_name";
@@ -25,7 +62,8 @@ function getDbConnection() {
     } catch (PDOException $e) {
         return [
             'error' => 'Database connection failed: ' . $e->getMessage(),
-            'status' => 500
+            'status' => 500,
+            'debug' => $debug_info
         ];
     }
 }
