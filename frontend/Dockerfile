@@ -15,31 +15,14 @@ COPY . ./
 ARG API_URL
 ENV API_URL=${API_URL}
 
-# Build the app
-RUN npm run build
+# Build the app using client-only configuration (no SSR)
+RUN npm run build -- --configuration=client-only
 
-# Production stage
-FROM nginx:alpine
-
-# Copy built assets from build stage
-COPY --from=build /app/dist/frontend /usr/share/nginx/html
-
-# Add nginx config for SPA routing
-RUN echo 'server { \
-  listen 80; \
-  location / { \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    try_files $uri $uri/ /index.html; \
-  } \
-}' > /etc/nginx/conf.d/default.conf
+# Copy server.js to the build directory
+COPY server.js ./
 
 # Expose port
-EXPOSE $PORT
+EXPOSE ${PORT:-3000}
 
-# Configure for Railway's dynamic port
-RUN echo 'sed -i "s/listen 80/listen $PORT/g" /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"' > /start.sh
-RUN chmod +x /start.sh
-
-# Start nginx
-CMD ["/start.sh"] 
+# Start the Express server
+CMD ["node", "server.js"] 

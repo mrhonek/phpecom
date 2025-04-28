@@ -1,3 +1,26 @@
+# PHPecom Frontend
+
+Angular-based frontend for the PHPecom e-commerce application.
+
+## Technologies Used
+- Angular 19
+- Angular Material
+- Docker
+
+## Development
+```
+npm install
+npm run dev
+```
+
+## Production Build
+```
+npm run build
+```
+
+## Deployment
+This application is configured for deployment on Railway using Docker.
+
 # Frontend
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.8.
