@@ -37,7 +37,12 @@ return [
         Illuminate\View\ViewServiceProvider::class,
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
-        App\Providers\RouteServiceProvider::class,
+        App\\Providers\\RouteServiceProvider::class,
+
+        /*
+         * Third-party Service Providers...
+         */
+        Intervention\\Image\\ImageServiceProvider::class,
     ],
     'aliases' => [
         'App' => Illuminate\Support\Facades\App::class,
@@ -59,7 +64,8 @@ return [
         'Gate' => Illuminate\Support\Facades\Gate::class,
         'Hash' => Illuminate\Support\Facades\Hash::class,
         'Http' => Illuminate\Support\Facades\Http::class,
-        'Js' => Illuminate\Support\Js::class,
+        'Js' => Illuminate\\Support\\Js::class,
+        'Image' => Intervention\\Image\\Facades\\Image::class,
         'Lang' => Illuminate\Support\Facades\Lang::class,
         'Log' => Illuminate\Support\Facades\Log::class,
         'Mail' => Illuminate\Support\Facades\Mail::class,

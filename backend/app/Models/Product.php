@@ -19,6 +19,10 @@ class Product extends Model
         'description',
         'price',
         'image_url',
+        'image_filename',
+        'image_path',
+        'image_alt',
+        'image_thumbnail',
         'stock',
     ];
 
@@ -30,6 +34,16 @@ class Product extends Model
     protected $casts = [
         'price' => 'decimal:2',
         'stock' => 'integer',
+    ];
+
+    /**
+     * Append custom attributes to the model.
+     *
+     * @var array
+     */
+    protected $appends = [
+        'full_image_url',
+        'thumbnail_url',
     ];
 
     /**
@@ -46,5 +60,34 @@ class Product extends Model
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * Get the full image URL.
+     */
+    public function getFullImageUrlAttribute()
+    {
+        if ($this->image_url && filter_var($this->image_url, FILTER_VALIDATE_URL)) {
+            return $this->image_url;
+        }
+        
+        if ($this->image_path && $this->image_filename) {
+            return url($this->image_path . '/' . $this->image_filename);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get the thumbnail URL.
+     */
+    public function getThumbnailUrlAttribute()
+    {
+        if ($this->image_path && $this->image_thumbnail) {
+            return url($this->image_path . '/' . $this->image_thumbnail);
+        }
+        
+        // If no thumbnail exists, return the full image or null
+        return $this->getFullImageUrlAttribute();
     }
 } 

@@ -17,8 +17,24 @@ class ProductController extends Controller
     {
         $products = Product::all();
         
+        // Add full image URL to each product
+        $productsWithImages = $products->map(function ($product) {
+            return [
+                'id' => $product->id,
+                'name' => $product->name,
+                'description' => $product->description,
+                'price' => $product->price,
+                'stock' => $product->stock,
+                'image_url' => $product->full_image_url,
+                'thumbnail_url' => $product->thumbnail_url,
+                'created_at' => $product->created_at,
+                'updated_at' => $product->updated_at,
+            ];
+        });
+        
         return response()->json([
-            'data' => $products
+            'status' => 'success',
+            'products' => $productsWithImages
         ]);
     }
 
@@ -38,8 +54,22 @@ class ProductController extends Controller
             ], 404);
         }
         
+        // Include full image URL
+        $productData = [
+            'id' => $product->id,
+            'name' => $product->name,
+            'description' => $product->description,
+            'price' => $product->price,
+            'stock' => $product->stock,
+            'image_url' => $product->full_image_url,
+            'thumbnail_url' => $product->thumbnail_url,
+            'created_at' => $product->created_at,
+            'updated_at' => $product->updated_at,
+        ];
+        
         return response()->json([
-            'data' => $product
+            'status' => 'success',
+            'product' => $productData
         ]);
     }
 
