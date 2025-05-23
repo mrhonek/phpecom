@@ -32,6 +32,103 @@ Route::middleware(['cors'])->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::get('/products', [ProductController::class, 'index']);
     Route::get('/products/{id}', [ProductController::class, 'show']);
+    
+    // Temporary route to update product images - REMOVE AFTER USE
+    Route::get('/admin/update-product-images', function () {
+        // The products data
+        $products = [
+            [
+                'id' => 1,
+                'image_filename' => 'smartphone-xs-pro.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Smartphone XS Pro on a wooden surface',
+                'image_thumbnail' => 'smartphone-xs-pro-thumb.jpg',
+            ],
+            [
+                'id' => 2,
+                'image_filename' => 'ultra-hd-tv.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Ultra HD Smart TV in modern living room',
+                'image_thumbnail' => 'ultra-hd-tv-thumb.jpg',
+            ],
+            [
+                'id' => 3,
+                'image_filename' => 'wireless-headphones.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Wireless noise-cancelling headphones in black',
+                'image_thumbnail' => 'wireless-headphones-thumb.jpg',
+            ],
+            [
+                'id' => 4,
+                'image_filename' => 'digital-camera.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Professional digital camera with lens',
+                'image_thumbnail' => 'digital-camera-thumb.jpg',
+            ],
+            [
+                'id' => 5,
+                'image_filename' => 'bluetooth-speaker.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Portable bluetooth speaker in blue color',
+                'image_thumbnail' => 'bluetooth-speaker-thumb.jpg',
+            ],
+            [
+                'id' => 6,
+                'image_filename' => 'fitness-smartwatch.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Fitness smartwatch showing heart rate',
+                'image_thumbnail' => 'fitness-smartwatch-thumb.jpg',
+            ],
+            [
+                'id' => 7,
+                'image_filename' => 'coffee-grinder.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Electric coffee grinder with coffee beans',
+                'image_thumbnail' => 'coffee-grinder-thumb.jpg',
+            ],
+            [
+                'id' => 8,
+                'image_filename' => 'mechanical-keyboard.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Mechanical keyboard with RGB lighting',
+                'image_thumbnail' => 'mechanical-keyboard-thumb.jpg',
+            ],
+            [
+                'id' => 9,
+                'image_filename' => 'office-chair.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Ergonomic office chair in black',
+                'image_thumbnail' => 'office-chair-thumb.jpg',
+            ],
+            [
+                'id' => 10,
+                'image_filename' => 'smart-home-hub.jpg',
+                'image_path' => 'images/products',
+                'image_alt' => 'Smart home hub on a coffee table',
+                'image_thumbnail' => 'smart-home-hub-thumb.jpg',
+            ],
+        ];
+
+        // Update each product directly
+        $updatedCount = 0;
+        foreach ($products as $productData) {
+            $product = \App\Models\Product::find($productData['id']);
+            if ($product) {
+                $product->update([
+                    'image_filename' => $productData['image_filename'],
+                    'image_path' => $productData['image_path'],
+                    'image_alt' => $productData['image_alt'],
+                    'image_thumbnail' => $productData['image_thumbnail'],
+                ]);
+                $updatedCount++;
+            }
+        }
+
+        return [
+            'status' => 'success',
+            'message' => "Updated {$updatedCount} products with image data",
+        ];
+    });
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
