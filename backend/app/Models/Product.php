@@ -63,23 +63,24 @@ class Product extends Model
     }
 
     /**
-     * Get the full image URL.
+     * Get the full image URL attribute.
+     *
+     * @return string|null
      */
     public function getFullImageUrlAttribute()
     {
-        if ($this->image_url && filter_var($this->image_url, FILTER_VALIDATE_URL)) {
-            return $this->image_url;
-        }
-        
         if ($this->image_path && $this->image_filename) {
             return url($this->image_path . '/' . $this->image_filename);
         }
         
-        return null;
+        // Return original image_url as fallback if no uploaded image
+        return $this->image_url;
     }
     
     /**
-     * Get the thumbnail URL.
+     * Get the thumbnail URL attribute.
+     *
+     * @return string|null
      */
     public function getThumbnailUrlAttribute()
     {
@@ -87,7 +88,7 @@ class Product extends Model
             return url($this->image_path . '/' . $this->image_thumbnail);
         }
         
-        // If no thumbnail exists, return the full image or null
-        return $this->getFullImageUrlAttribute();
+        // Return full image if no thumbnail
+        return $this->full_image_url;
     }
 } 
