@@ -11,8 +11,15 @@ header('Content-Type: application/json');
 // Get database credentials from environment variables
 function getDbCredentials() {
     // Try to get from environment variables (Railway sets these directly)
+    $dbConnection = getenv('DB_CONNECTION') ?: $_ENV['DB_CONNECTION'] ?? null;
+    
+    // Check if the connection string is a full URL (postgres://user:pass@host:port/db)
+    if ($dbConnection && strpos($dbConnection, '://') !== false) {
+        return parseConnectionUrl($dbConnection);
+    }
+    
     $credentials = [
-        'driver' => getenv('DB_CONNECTION') ?: $_ENV['DB_CONNECTION'] ?? 'pgsql',
+        'driver' => $dbConnection ?: 'pgsql',
         'host' => getenv('DB_HOST') ?: $_ENV['DB_HOST'] ?? null,
         'port' => getenv('DB_PORT') ?: $_ENV['DB_PORT'] ?? null,
         'database' => getenv('DB_DATABASE') ?: $_ENV['DB_DATABASE'] ?? null,
@@ -36,17 +43,72 @@ function getDbCredentials() {
     return $credentials;
 }
 
-// Connect to the database
+// Parse a database connection URL
+function parseConnectionUrl($url) {
+    $parsedUrl = parse_url($url);
+    
+    if ($parsedUrl === false) {
+        return [
+            'error' => 'Failed to parse connection URL',
+            'url' => $url
+        ];
+    }
+    
+    $driver = ($parsedUrl['scheme'] === 'postgres') ? 'pgsql' : $parsedUrl['scheme'];
+    $username = $parsedUrl['user'] ?? null;
+    $password = $parsedUrl['pass'] ?? null;
+    $host = $parsedUrl['host'] ?? null;
+    $port = $parsedUrl['port'] ?? null;
+    $database = ltrim($parsedUrl['path'] ?? '', '/');
+    
+    return [
+        'driver' => $driver,
+        'host' => $host,
+        'port' => $port,
+        'database' => $database,
+        'username' => $username,
+        'password' => $password,
+    ];
+}
+
+// Connect to the database using a direct connection string
 function connectToDatabase() {
     $credentials = getDbCredentials();
     
+    if (isset($credentials['error'])) {
+        return $credentials;
+    }
+    
     try {
-        $dsn = "{$credentials['driver']}:host={$credentials['host']}";
-        if ($credentials['port']) {
-            $dsn .= ";port={$credentials['port']}";
+        // For PostgreSQL
+        if ($credentials['driver'] === 'pgsql') {
+            $dsn = "pgsql:host={$credentials['host']}";
+            if (!empty($credentials['port'])) {
+                $dsn .= ";port={$credentials['port']}";
+            }
+            if (!empty($credentials['database'])) {
+                $dsn .= ";dbname={$credentials['database']}";
+            }
+        } 
+        // For MySQL
+        else if ($credentials['driver'] === 'mysql') {
+            $dsn = "mysql:host={$credentials['host']}";
+            if (!empty($credentials['port'])) {
+                $dsn .= ";port={$credentials['port']}";
+            }
+            if (!empty($credentials['database'])) {
+                $dsn .= ";dbname={$credentials['database']}";
+            }
         }
-        if ($credentials['database']) {
-            $dsn .= ";dbname={$credentials['database']}";
+        // Default fallback
+        else {
+            $dsn = "{$credentials['driver']}:host={$credentials['host']}";
+            if (!empty($credentials['port'])) {
+                $dsn .= ";port={$credentials['port']}";
+            }
+            if (!empty($credentials['database'])) {
+                $dsn .= ";dbname={$credentials['database']}";
+            }
         }
         
         $pdo = new PDO(
@@ -70,7 +132,8 @@ function connectToDatabase() {
                 'port' => $credentials['port'],
                 'database' => $credentials['database'],
                 'username' => $credentials['username'],
-            ]
+            ],
+            'dsn' => $dsn ?? null,
         ];
     }
 }
@@ -107,6 +170,7 @@ function listEnvironmentVariables() {
             'DB_DATABASE' => getenv('DB_DATABASE'),
             'DB_USERNAME' => getenv('DB_USERNAME'),
             'PGPASSWORD' => getenv('PGPASSWORD') ? '[REDACTED]' : null,
+            'DATABASE_URL' => getenv('DATABASE_URL') ? '[POSSIBLY SENSITIVE]' : null,
         ]
     ];
 }
