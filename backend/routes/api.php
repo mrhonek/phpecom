@@ -27,6 +27,33 @@ Route::middleware(['cors'])->group(function () {
         return response()->json(['status' => 'ok', 'version' => '1.0.0']);
     });
 
+    // Simple admin health check
+    Route::get('/admin-health', function () {
+        return response()->json(['status' => 'ok', 'message' => 'Admin routes are working']);
+    });
+    
+    // Direct simple product image update
+    Route::get('/update-images', function () {
+        $updatedCount = 0;
+        for ($i = 1; $i <= 10; $i++) {
+            $product = \App\Models\Product::find($i);
+            if ($product) {
+                $product->update([
+                    'image_filename' => 'product-' . $i . '.jpg',
+                    'image_path' => 'images/products',
+                    'image_alt' => 'Product ' . $i,
+                    'image_thumbnail' => 'product-' . $i . '-thumb.jpg',
+                ]);
+                $updatedCount++;
+            }
+        }
+        
+        return [
+            'status' => 'success',
+            'message' => "Updated {$updatedCount} products with image data",
+        ];
+    });
+
     // Public routes
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
