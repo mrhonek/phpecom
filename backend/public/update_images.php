@@ -263,6 +263,75 @@ function checkTableColumns($connection, $connectionType) {
     }
 }
 
+// Add missing columns to the products table
+function addMissingColumns($connection, $connectionType, $missingColumns) {
+    try {
+        // First check if the table exists
+        if ($connectionType === 'pdo') {
+            $tableExistsQuery = "
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'products'
+                ) as table_exists
+            ";
+            $stmt = $connection->query($tableExistsQuery);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $tableExists = $result['table_exists'] === 't' || $result['table_exists'] === '1' || $result['table_exists'] === true;
+        } else if ($connectionType === 'pgsql') {
+            $tableExistsResult = pg_query($connection, "
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'products'
+                ) as table_exists
+            ");
+            $result = pg_fetch_assoc($tableExistsResult);
+            $tableExists = $result['table_exists'] === 't' || $result['table_exists'] === '1' || $result['table_exists'] === true;
+        } else {
+            return [
+                'error' => 'Unsupported connection type',
+                'type' => $connectionType
+            ];
+        }
+        
+        if (!$tableExists) {
+            return [
+                'error' => 'Products table does not exist'
+            ];
+        }
+        
+        $addedColumns = [];
+        
+        // Add each missing column
+        foreach ($missingColumns as $column) {
+            // Skip 'id' column since it should be the primary key
+            if ($column === 'id') {
+                continue;
+            }
+            
+            $dataType = 'TEXT'; // Default data type for all our image fields
+            
+            if ($connectionType === 'pdo') {
+                $sql = "ALTER TABLE products ADD COLUMN IF NOT EXISTS {$column} {$dataType}";
+                $connection->exec($sql);
+                $addedColumns[] = $column;
+            } else if ($connectionType === 'pgsql') {
+                $sql = "ALTER TABLE products ADD COLUMN IF NOT EXISTS {$column} {$dataType}";
+                pg_query($connection, $sql);
+                $addedColumns[] = $column;
+            }
+        }
+        
+        return [
+            'status' => 'success',
+            'added_columns' => $addedColumns
+        ];
+    } catch (Exception $e) {
+        return [
+            'error' => 'Failed to add columns: ' . $e->getMessage()
+        ];
+    }
+}
+
 // Update product images with different connection types
 function updateProductImages($connectionData) {
     $connection = $connectionData['connection'];
@@ -270,7 +339,28 @@ function updateProductImages($connectionData) {
     
     // Check if the table has the required columns
     $columnsCheck = checkTableColumns($connection, $connectionType);
-    if ($columnsCheck !== true) {
+    
+    // If columns are missing, attempt to add them
+    if (isset($columnsCheck['error']) && $columnsCheck['error'] === 'Missing required columns') {
+        $missingColumns = $columnsCheck['missing'];
+        $addColumnsResult = addMissingColumns($connection, $connectionType, $missingColumns);
+        
+        if (isset($addColumnsResult['error'])) {
+            return [
+                'error' => 'Failed to add missing columns',
+                'detail' => $addColumnsResult
+            ];
+        }
+        
+        // Re-check columns after adding them
+        $columnsCheck = checkTableColumns($connection, $connectionType);
+        if ($columnsCheck !== true) {
+            return [
+                'error' => 'Still missing required columns after attempting to add them',
+                'detail' => $columnsCheck
+            ];
+        }
+    } elseif ($columnsCheck !== true) {
         return $columnsCheck;
     }
     
