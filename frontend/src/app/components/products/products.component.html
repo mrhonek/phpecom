@@ -13,7 +13,7 @@
   <div class="products-grid">
     <div *ngFor="let product of products" class="product-card">
       <div class="product-image">
-        <img [src]="product.image_url || 'assets/placeholder.jpg'" [alt]="product.name">
+        <img [src]="product.full_image_url || product.image_url || 'assets/placeholder.jpg'" [alt]="product.name">
       </div>
       <div class="product-details">
         <h3>
@@ -21,7 +21,7 @@
         </h3>
         <p class="product-description">{{ product.description | slice:0:100 }}{{ product.description.length > 100 ? '...' : '' }}</p>
         <div class="product-price-stock">
-          <span class="product-price">${{ product.price.toFixed(2) }}</span>
+          <span class="product-price">${{ formatPrice(product.price) }}</span>
           <span class="product-stock" [class.low-stock]="product.stock < 5">
             {{ product.stock === 0 ? 'Out of stock' : product.stock + ' in stock' }}
           </span>

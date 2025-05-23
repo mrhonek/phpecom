@@ -70,7 +70,17 @@ class Product extends Model
     public function getFullImageUrlAttribute()
     {
         if ($this->image_path && $this->image_filename) {
-            return url($this->image_path . '/' . $this->image_filename);
+            $localPath = public_path($this->image_path . '/' . $this->image_filename);
+            
+            // Check if the file exists locally
+            if (file_exists($localPath)) {
+                return url($this->image_path . '/' . $this->image_filename);
+            }
+            
+            // If file doesn't exist, use placeholder service
+            $name = urlencode($this->name);
+            $id = $this->id ?: 1;
+            return "https://source.unsplash.com/300x200/?product," . $name;
         }
         
         // Return original image_url as fallback if no uploaded image
@@ -85,7 +95,17 @@ class Product extends Model
     public function getThumbnailUrlAttribute()
     {
         if ($this->image_path && $this->image_thumbnail) {
-            return url($this->image_path . '/' . $this->image_thumbnail);
+            $localPath = public_path($this->image_path . '/' . $this->image_thumbnail);
+            
+            // Check if the file exists locally
+            if (file_exists($localPath)) {
+                return url($this->image_path . '/' . $this->image_thumbnail);
+            }
+            
+            // If thumbnail file doesn't exist, use placeholder service
+            $name = urlencode($this->name);
+            $id = $this->id ?: 1;
+            return "https://source.unsplash.com/150x100/?product," . $name;
         }
         
         // Return full image if no thumbnail
