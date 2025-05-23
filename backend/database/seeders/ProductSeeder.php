@@ -3,8 +3,11 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
+use App\Models\CartItem;
+use App\Models\OrderItem;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ProductSeeder extends Seeder
 {
@@ -13,10 +16,67 @@ class ProductSeeder extends Seeder
      */
     public function run(): void
     {
-        // Clear existing products
-        DB::table('products')->truncate();
+        // Check for existing related records
+        $hasCartItems = CartItem::count() > 0;
+        $hasOrderItems = OrderItem::count() > 0;
         
-        $products = [
+        if ($hasCartItems || $hasOrderItems) {
+            // If there are related records, we'll update existing products instead of truncating
+            $this->updateExistingProducts();
+        } else {
+            // Clear existing products if no related records exist
+            Schema::disableForeignKeyConstraints();
+            DB::table('products')->truncate();
+            Schema::enableForeignKeyConstraints();
+            
+            $this->createNewProducts();
+        }
+    }
+    
+    /**
+     * Create new products from scratch
+     */
+    private function createNewProducts(): void
+    {
+        $products = $this->getProductsData();
+        
+        foreach ($products as $product) {
+            Product::create($product);
+        }
+    }
+    
+    /**
+     * Update existing products without truncating
+     */
+    private function updateExistingProducts(): void
+    {
+        $products = $this->getProductsData();
+        
+        // Get all existing products
+        $existingProducts = Product::all();
+        
+        // Only process up to the number of existing products
+        for ($i = 0; $i < min(count($products), count($existingProducts)); $i++) {
+            // Update existing product with new data
+            $existingProducts[$i]->update($products[$i]);
+        }
+        
+        // If we have more products in our seed data than exist in the database,
+        // create the additional products
+        if (count($products) > count($existingProducts)) {
+            $additionalProducts = array_slice($products, count($existingProducts));
+            foreach ($additionalProducts as $product) {
+                Product::create($product);
+            }
+        }
+    }
+    
+    /**
+     * Get the products data array
+     */
+    private function getProductsData(): array
+    {
+        return [
             [
                 'name' => 'Smartphone XS Pro',
                 'description' => 'Latest flagship smartphone with advanced camera system and all-day battery life.',
@@ -128,9 +188,5 @@ class ProductSeeder extends Seeder
                 'stock' => 15,
             ],
         ];
-
-        foreach ($products as $product) {
-            Product::create($product);
-        }
     }
 } 
