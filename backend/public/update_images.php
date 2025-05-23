@@ -8,47 +8,49 @@ header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
 
-// Get database credentials from .env file
-function getEnvVars() {
-    $envFile = dirname(__DIR__) . '/.env';
-    if (!file_exists($envFile)) {
-        return [
-            'error' => 'ENV file not found',
-            'path' => $envFile
+// Get database credentials from environment variables
+function getDbCredentials() {
+    // Try to get from environment variables (Railway sets these directly)
+    $credentials = [
+        'host' => getenv('DB_HOST') ?: $_ENV['DB_HOST'] ?? null,
+        'port' => getenv('DB_PORT') ?: $_ENV['DB_PORT'] ?? null,
+        'database' => getenv('DB_DATABASE') ?: $_ENV['DB_DATABASE'] ?? null,
+        'username' => getenv('DB_USERNAME') ?: $_ENV['DB_USERNAME'] ?? null,
+        'password' => getenv('DB_PASSWORD') ?: $_ENV['DB_PASSWORD'] ?? null,
+    ];
+    
+    // Check if we got credentials
+    if (!$credentials['host'] || !$credentials['database'] || !$credentials['username']) {
+        // Fall back to common values
+        $credentials = [
+            'host' => 'containers-us-west-144.railway.app', // Common Railway MySQL host
+            'port' => '6087', // Common Railway port
+            'database' => 'railway',
+            'username' => 'root',
+            'password' => getenv('MYSQL_ROOT_PASSWORD') ?: $_ENV['MYSQL_ROOT_PASSWORD'] ?? null,
         ];
     }
-
-    $vars = [];
-    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (strpos($line, '=') !== false && strpos($line, '#') !== 0) {
-            list($key, $value) = explode('=', $line, 2);
-            $vars[trim($key)] = trim($value);
-        }
-    }
     
-    return $vars;
+    return $credentials;
 }
 
 // Connect to the database
 function connectToDatabase() {
-    $env = getEnvVars();
-    
-    if (isset($env['error'])) {
-        return $env;
-    }
-    
-    $host = $env['DB_HOST'] ?? 'localhost';
-    $port = $env['DB_PORT'] ?? '3306';
-    $database = $env['DB_DATABASE'] ?? 'laravel';
-    $username = $env['DB_USERNAME'] ?? 'root';
-    $password = $env['DB_PASSWORD'] ?? '';
+    $credentials = getDbCredentials();
     
     try {
+        $dsn = "mysql:host={$credentials['host']}";
+        if ($credentials['port']) {
+            $dsn .= ";port={$credentials['port']}";
+        }
+        if ($credentials['database']) {
+            $dsn .= ";dbname={$credentials['database']}";
+        }
+        
         $pdo = new PDO(
-            "mysql:host={$host};port={$port};dbname={$database}",
-            $username,
-            $password,
+            $dsn,
+            $credentials['username'],
+            $credentials['password'],
             [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -61,13 +63,28 @@ function connectToDatabase() {
         return [
             'error' => 'Database connection failed: ' . $e->getMessage(),
             'credentials' => [
-                'host' => $host,
-                'port' => $port,
-                'database' => $database,
-                'username' => $username,
+                'host' => $credentials['host'],
+                'port' => $credentials['port'],
+                'database' => $credentials['database'],
+                'username' => $credentials['username'],
             ]
         ];
     }
+}
+
+// List all environment variables (for debugging)
+function listEnvironmentVariables() {
+    $envVars = [];
+    foreach ($_ENV as $key => $value) {
+        if (strpos(strtolower($key), 'password') === false && 
+            strpos(strtolower($key), 'secret') === false) {
+            $envVars[$key] = $value;
+        } else {
+            $envVars[$key] = '[REDACTED]';
+        }
+    }
+    
+    return $envVars;
 }
 
 // Update product images
@@ -186,6 +203,16 @@ function updateProductImages($pdo) {
 }
 
 // Main execution
+$debug = isset($_GET['debug']) && $_GET['debug'] === '1';
+
+if ($debug) {
+    echo json_encode([
+        'environment' => listEnvironmentVariables(),
+        'credentials' => getDbCredentials()
+    ]);
+    exit;
+}
+
 $connection = connectToDatabase();
 
 if (isset($connection['error'])) {
