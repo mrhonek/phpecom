@@ -12,6 +12,7 @@ header('Content-Type: application/json');
 function getDbCredentials() {
     // Try to get from environment variables (Railway sets these directly)
     $credentials = [
+        'driver' => getenv('DB_CONNECTION') ?: $_ENV['DB_CONNECTION'] ?? 'pgsql',
         'host' => getenv('DB_HOST') ?: $_ENV['DB_HOST'] ?? null,
         'port' => getenv('DB_PORT') ?: $_ENV['DB_PORT'] ?? null,
         'database' => getenv('DB_DATABASE') ?: $_ENV['DB_DATABASE'] ?? null,
@@ -21,13 +22,14 @@ function getDbCredentials() {
     
     // Check if we got credentials
     if (!$credentials['host'] || !$credentials['database'] || !$credentials['username']) {
-        // Fall back to common values
+        // Fall back to common values for PostgreSQL on Railway
         $credentials = [
-            'host' => 'containers-us-west-144.railway.app', // Common Railway MySQL host
-            'port' => '6087', // Common Railway port
+            'driver' => 'pgsql',
+            'host' => 'postgres.railway.internal',
+            'port' => '5432',
             'database' => 'railway',
-            'username' => 'root',
-            'password' => getenv('MYSQL_ROOT_PASSWORD') ?: $_ENV['MYSQL_ROOT_PASSWORD'] ?? null,
+            'username' => 'postgres',
+            'password' => getenv('PGPASSWORD') ?: $_ENV['PGPASSWORD'] ?? null,
         ];
     }
     
@@ -39,7 +41,7 @@ function connectToDatabase() {
     $credentials = getDbCredentials();
     
     try {
-        $dsn = "mysql:host={$credentials['host']}";
+        $dsn = "{$credentials['driver']}:host={$credentials['host']}";
         if ($credentials['port']) {
             $dsn .= ";port={$credentials['port']}";
         }
@@ -63,6 +65,7 @@ function connectToDatabase() {
         return [
             'error' => 'Database connection failed: ' . $e->getMessage(),
             'credentials' => [
+                'driver' => $credentials['driver'],
                 'host' => $credentials['host'],
                 'port' => $credentials['port'],
                 'database' => $credentials['database'],
@@ -84,11 +87,73 @@ function listEnvironmentVariables() {
         }
     }
     
-    return $envVars;
+    $serverVars = [];
+    foreach ($_SERVER as $key => $value) {
+        if (strpos(strtolower($key), 'password') === false && 
+            strpos(strtolower($key), 'secret') === false) {
+            $serverVars[$key] = $value;
+        } else {
+            $serverVars[$key] = '[REDACTED]';
+        }
+    }
+    
+    return [
+        'env' => $envVars,
+        'server' => $serverVars,
+        'getenv' => [
+            'DB_CONNECTION' => getenv('DB_CONNECTION'),
+            'DB_HOST' => getenv('DB_HOST'),
+            'DB_PORT' => getenv('DB_PORT'),
+            'DB_DATABASE' => getenv('DB_DATABASE'),
+            'DB_USERNAME' => getenv('DB_USERNAME'),
+            'PGPASSWORD' => getenv('PGPASSWORD') ? '[REDACTED]' : null,
+        ]
+    ];
+}
+
+// Check if the table has the required columns
+function checkTableColumns($pdo) {
+    try {
+        // For PostgreSQL
+        $sql = "
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'products'
+        ";
+        
+        $stmt = $pdo->query($sql);
+        $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        $requiredColumns = [
+            'id', 'image_filename', 'image_path', 'image_alt', 'image_thumbnail'
+        ];
+        
+        $missingColumns = array_diff($requiredColumns, $columns);
+        
+        if (!empty($missingColumns)) {
+            return [
+                'error' => 'Missing required columns',
+                'missing' => $missingColumns,
+                'available' => $columns
+            ];
+        }
+        
+        return true;
+    } catch (PDOException $e) {
+        return [
+            'error' => 'Failed to check table columns: ' . $e->getMessage()
+        ];
+    }
 }
 
 // Update product images
 function updateProductImages($pdo) {
+    // Check if the table has the required columns
+    $columnsCheck = checkTableColumns($pdo);
+    if ($columnsCheck !== true) {
+        return $columnsCheck;
+    }
+    
     // Define product images data
     $products = [
         [
